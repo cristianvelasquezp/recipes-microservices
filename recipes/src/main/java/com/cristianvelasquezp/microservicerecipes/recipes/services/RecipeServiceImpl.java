@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Logger;
 
 @Service
 public class RecipeServiceImpl implements RecipeService {
@@ -39,6 +40,7 @@ public class RecipeServiceImpl implements RecipeService {
         try {
             return recipeRepository.save(recipe);
         } catch (Exception e) {
+            Logger.getGlobal().severe("An error occurred while creating recipe: " + e.getMessage());
             throw new DatabaseConnectionException("An error occurred while creating recipe: " + e.getMessage(), e);
         }
     }
