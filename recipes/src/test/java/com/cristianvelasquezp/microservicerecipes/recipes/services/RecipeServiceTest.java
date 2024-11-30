@@ -3,21 +3,21 @@ package com.cristianvelasquezp.microservicerecipes.recipes.services;
 import com.cristianvelasquezp.microservicerecipes.recipes.Entities.CategoryEntity;
 import com.cristianvelasquezp.microservicerecipes.recipes.Entities.IngredientEntity;
 import com.cristianvelasquezp.microservicerecipes.recipes.Entities.RecipeEntity;
+import com.cristianvelasquezp.microservicerecipes.recipes.exceptions.RecipeNotFoundException;
 import com.cristianvelasquezp.microservicerecipes.recipes.repositories.RecipeRepository;
+import com.cristianvelasquezp.microservicerecipes.recipes.utils.RecipeTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,9 +34,11 @@ class RecipeServiceImplTest {
 
     private List<RecipeEntity> recipes;
 
+
     @BeforeEach
     void setUp() {
-        recipes = createRecipeEntities();
+        RecipeTestUtils recipeTestUtils = new RecipeTestUtils();
+        recipes = recipeTestUtils.createRecipeEntities();
     }
 
 
@@ -93,11 +95,11 @@ class RecipeServiceImplTest {
         // Then
         assertTrue(actualRecipe.isPresent());
         assertEquals(1L, actualRecipe.get().getId());
-        assertEquals("Recipe 1", actualRecipe.get().getName());
-        assertEquals("Description for Recipe 1", actualRecipe.get().getDescription());
-        assertEquals("Category 1", actualRecipe.get().getCategory().getName());
-        assertEquals("Directions for Recipe 1", actualRecipe.get().getDirections());
-        assertEquals("Ingredient 1", actualRecipe.get().getIngredients().getFirst().getValue());
+        assertEquals("Spaghetti Bolognese", actualRecipe.get().getName());
+        assertEquals("Classic Italian pasta dish with a rich meat sauce.", actualRecipe.get().getDescription());
+        assertEquals("Italian", actualRecipe.get().getCategory().getName());
+        assertEquals("Cook pasta. Prepare sauce. Combine and serve.", actualRecipe.get().getDirections());
+        assertEquals("Spaghetti", actualRecipe.get().getIngredients().getFirst().getValue());
         assertEquals(1, actualRecipe.get().getUserId());
     }
 
@@ -143,7 +145,7 @@ class RecipeServiceImplTest {
         when(recipeRepository.save(recipe)).thenReturn(getRecipeWithId(recipe));
 
         // When
-        RecipeEntity actualRecipe = recipeService.createRecipeEntities(recipe);
+        RecipeEntity actualRecipe = recipeService.createRecipe(recipe);
 
         // Then
         assertNotNull(actualRecipe);
@@ -171,7 +173,7 @@ class RecipeServiceImplTest {
         when(recipeRepository.save(recipe)).thenThrow(new RuntimeException("Database error"));
 
         // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> recipeService.createRecipeEntities(recipe));
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> recipeService.createRecipe(recipe));
         assertEquals("An error occurred while creating recipe: Database error", exception.getMessage());
     }
 
@@ -189,6 +191,7 @@ class RecipeServiceImplTest {
         recipe.setDirections("Updated Directions for Recipe 1");
         recipe.setIngredients(List.of(new IngredientEntity(11L, "Updated Ingredient 1")));
         recipe.setUserId(11);
+        when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
         when(recipeRepository.save(recipe)).thenReturn(recipe);
 
         // When
@@ -205,12 +208,45 @@ class RecipeServiceImplTest {
         assertEquals(11, actualRecipe.getUserId());
     }
 
+    @DisplayName("Should throw an exception with a specific message when the recipe does not have an id")
+    @Test
+    void testUpdateRecipe_whenRecipeDoesNotHaveId_throwExceptionWithSpecificMessage() {
+        // Given
+        RecipeEntity recipe = new RecipeEntity();
+        recipe.setName("Updated Recipe 1");
+        recipe.setDescription("Updated Description for Recipe 1");
+        recipe.setCategory(new CategoryEntity(11L, "Updated Category 1"));
+        recipe.setDate(new Timestamp(System.currentTimeMillis()));
+        recipe.setDirections("Updated Directions for Recipe 1");
+        recipe.setIngredients(List.of(new IngredientEntity(11L, "Updated Ingredient 1")));
+        recipe.setUserId(11);
+
+        // When & Then
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> recipeService.updateRecipe(recipe));
+        assertEquals("Recipe must have an id to be updated", exception.getMessage());
+    }
+
+    @DisplayName("Should throw an exception with a specific message when the recipe does not exist in the database")
+    @Test
+    void testUpdateRecipe_whenRecipeDoesNotExist_throwExceptionWithSpecificMessage() {
+        // Given
+        RecipeEntity recipe = recipes.getFirst();
+        recipe.setId(11L);
+        recipe.setName("Updated Recipe 1");
+        when(recipeRepository.findById(11L)).thenReturn(Optional.empty());
+
+        // When & Then
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> recipeService.updateRecipe(recipe));
+        assertEquals("An error occurred while updating recipe: Recipe with id 11 not found", exception.getMessage());
+    }
+
     @DisplayName("Should throw an exception with a specific message when the repository returns an error")
     @Test
     void testUpdateRecipe_whenRepositoryThrowsException_throwExceptionWithSpecificMessage() {
         // Given
         RecipeEntity recipe = recipes.getFirst();
         recipe.setName("Updated Recipe 1");
+        when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
         when(recipeRepository.save(recipe)).thenThrow(new RuntimeException("Database error"));
 
         // When & Then
@@ -225,7 +261,7 @@ class RecipeServiceImplTest {
     void testDeleteRecipe_whenRecipeIsDeleted_returnTrue() {
         // Given
         long id = 1L;
-
+        when(recipeRepository.existsById(id)).thenReturn(true);
         // When
         boolean isDeleted = recipeService.deleteRecipe(id);
 
@@ -233,29 +269,19 @@ class RecipeServiceImplTest {
         assertTrue(isDeleted);
     }
 
+    @DisplayName("Should throw an exception with a specific message when the id does not exist in the database")
+    @Test
+    void testDeleteRecipe_whenIdDoesNotExist_throwExceptionWithSpecificMessage() {
+        // Given
+        long id = 11L;
+        when(recipeRepository.existsById(id)).thenReturn(false);
+        // When & Then
+        RuntimeException exception = assertThrows(RecipeNotFoundException.class, () -> recipeService.deleteRecipe(id));
+        assertEquals("An error occurred while deleting recipe: Recipe with id 11 not found", exception.getMessage());
+    }
+
     private RecipeEntity getRecipeWithId(RecipeEntity recipe) {
         recipe.setId(11L);
         return recipe;
-    }
-
-
-    public static List<RecipeEntity> createRecipeEntities() {
-        List<RecipeEntity> recipeEntities = new ArrayList<>();
-
-        for (int i = 1; i <= 10; i++) {
-            RecipeEntity recipe = new RecipeEntity();
-            recipe.setId((long) i);
-            recipe.setName("Recipe " + i);
-            recipe.setDescription("Description for Recipe " + i);
-            recipe.setCategory(new CategoryEntity((long) i, "Category " + i));
-            recipe.setDate(new Timestamp(System.currentTimeMillis()));
-            recipe.setDirections("Directions for Recipe " + i);
-            recipe.setIngredients(List.of(new IngredientEntity((long) i, "Ingredient " + i)));
-            recipe.setUserId(i);
-
-            recipeEntities.add(recipe);
-        }
-
-        return recipeEntities;
     }
 }
