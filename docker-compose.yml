@@ -1,0 +1,35 @@
+services:
+  configservice:
+    image: "cristianvelasquezp/config-server:1.0.0"
+    container_name: configserver-ms
+    ports:
+      - "8071:8071"
+    healthcheck:
+      test: "curl --fail --silent localhost:8071/actuator/health/readiness | grep UP || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    environment:
+      GIT_PASSWORD: ${GIT_PASSWORD}
+      ENCRYPT_KEY: ${ENCRYPT_KEY}
+    networks:
+      - recipe
+
+  recipes:
+    image: "cristianvelasquezp/recipes:1.0.0"
+    container_name: recipes-ms
+    ports:
+      - "8080:8080"
+    depends_on:
+      configservice:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      CONFIG_SERVER_URL: ${CONFIG_SERVER_URL}
+    networks:
+      - recipe
+
+networks:
+    recipe:
+      driver: "bridge"
