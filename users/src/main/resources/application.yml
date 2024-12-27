@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: users
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE}
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL}
+server:
+  port: 8081
