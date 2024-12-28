@@ -4,11 +4,13 @@ import com.cristianvelasquezp.microservicerecipes.users.entities.UserEntity;
 import com.cristianvelasquezp.microservicerecipes.users.exceptions.DatabaseConnectionException;
 import com.cristianvelasquezp.microservicerecipes.users.exceptions.UserNotFoundException;
 import com.cristianvelasquezp.microservicerecipes.users.repositories.UserRepository;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Logger;
 
+@Service
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
